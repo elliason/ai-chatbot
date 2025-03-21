@@ -5,13 +5,14 @@ USER_UID=`id -u`
 AS_LOCAL_USER=-u $(USER_UID)
 ENV_FILES=--env-file `pwd`/.docker/.env.application
 SOURCES_MAPPING=-v `pwd`:/var/www/html
-WITH_FLAGS=--rm $(ENV_FILES) $(SOURCES_MAPPING)
+WITH_FLAGS=--rm $(ENV_FILES) $(SOURCES_MAPPING) --network=chatbot-private --env POSTGRES_URL=$(POSTGRES_URL)
 
 POSTGRES_URL=postgres://postgres:postgres@postgres-chatbot:5432/postgres
 
 
 init:
-	docker run $(AS_LOCAL_USER) $(WITH_FLAGS) $(NODE_IMAGE) bash -c "pnpm i"
+	./bin/create-internal-net.sh chatbot-private
+	docker run $(AS_LOCAL_USER) $(WITH_FLAGS) $(NODE_IMAGE) bash -c "pnpm i && pnpm db:generate && pnpm db:migrate"
 
 start:
 	./bin/create-internal-net.sh chatbot-private
@@ -26,4 +27,5 @@ restart:
 	make start
 
 run:
-	docker run -it --network=chatbot-private --env POSTGRES_URL=$(POSTGRES_URL) $(AS_LOCAL_USER) $(WITH_FLAGS) $(NODE_IMAGE) bash
+	./bin/create-internal-net.sh chatbot-private
+	docker run -it  $(AS_LOCAL_USER) $(WITH_FLAGS) $(NODE_IMAGE) bash
