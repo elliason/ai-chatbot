@@ -1,0 +1,93 @@
+services:
+  app:
+    image: ${NODE_IMAGE}
+    hostname: "app.${PROJECT_NAME}"
+    volumes:
+      - ../:/var/www/html
+    working_dir: /var/www/html
+    command: ["pnpm", "dev"]
+    environment:
+      POSTGRES_URL: postgres://postgres:postgres@postgres-chatbot:5432/postgres
+    env_file:
+      - .env.application
+    networks:
+      - webapp
+      - private
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=webapp"
+      - "traefik.http.routers.chatbot.rule=Host(`app.chatbot.localhost`)"
+      - "traefik.http.routers.chatbot.entrypoints=https"
+      - "traefik.http.routers.chatbot.tls=true"
+      - "traefik.http.services.chatbot.loadbalancer.server.port=3000"
+      - "traefik.http.routers.chatbot.tls.certresolver=local"
+
+  postgres:
+    image: postgres:17
+    hostname: "postgres.${PROJECT_NAME}"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    labels:
+      - "traefik.enable=false"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      private:
+        aliases:
+          - "postgres-chatbot"
+
+  pgadmin:
+    image: ${PGADMIN_IMAGE}
+    container_name: "${PROJECT_NAME}-pgadmin"
+    hostname: "pgadmin.${PROJECT_NAME}"
+    depends_on:
+      - postgres
+    networks:
+      - private
+      - webapp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=webapp"
+      - "traefik.http.routers.${PROJECT_NAME}-pgadmin.rule=Host(`pgadmin.chatbot.localhost`)"
+      - "traefik.http.routers.${PROJECT_NAME}-pgadmin.entrypoints=https"
+      - "traefik.http.routers.${PROJECT_NAME}-pgadmin.tls=true"
+      - "traefik.http.routers.${PROJECT_NAME}-pgadmin.tls.certresolver=local"
+    user: root
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD}"
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      TZ: "${APP_TIMEZONE}"
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    configs:
+      - source: servers.json
+        target: /pgadmin4/servers.json
+
+volumes:
+  postgres_data:
+  pgadmin:
+
+networks:
+  webapp:
+    external: true
+  private:
+    external: true
+    name: chatbot-private
+
+configs:
+  servers.json:
+    content: |
+      {"Servers": {"1": {
+        "Group": "Servers",
+        "Name": "chatbot",
+        "Host": "postgres-chatbot",
+        "Port": 5432,
+        "MaintenanceDB": "postgres",
+        "Username": "postgres",
+        "Password": "postgres",
+        "SSLMode": "prefer"
+      }}}
