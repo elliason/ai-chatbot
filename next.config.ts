@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  allowedDevOrigins: ['app.chatbot.localhost'],
 };
 
 export default nextConfig;
